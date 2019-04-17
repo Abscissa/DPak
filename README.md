@@ -23,3 +23,7 @@ Some of the informal discussion that led to this repo:
 - http://forum.dlang.org/post/q97mqm$1lr0$1@digitalmars.com
 - http://forum.dlang.org/post/mailman.8197.1555526745.29801.digitalmars-d@puremagic.com
 - http://forum.dlang.org/post/q97su1$22kl$1@digitalmars.com
+
+Notes:
+- DPak may want to use and/or collaboprate with this initiative, which has similar goals:
+http://forum.dlang.org/post/caplhrtaemdzuhpkppdg@forum.dlang.org
