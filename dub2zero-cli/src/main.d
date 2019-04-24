@@ -58,28 +58,15 @@ void main(string[] args)
 	processArgs(args);
 	auto packName = args[1];
 	auto packVer  = args[2];
-	yap("Yo!", packName, "@", packVer);
-	//yap(args);
 
 	auto workDir = sandbox(packName, packVer);
 	yap("In: ", getcwd);
 	
 	run("dub fetch --cache=local "~packName~" --version="~packVer);
-	yap("----------------------------------------------");
-	run("ls -l");
-	yap("----------------------------------------------");
-	run("ls -l "~packName~"-"~packVer);
-	yap("----------------------------------------------");
-	//run("ls -l "~(Path(packName~"-"~packVer)~packName).toString);
 	chdir(Path(packName~"-"~packVer)~packName);
-	run("ls -l");
 	
-	run("dub describe");
 	auto dubJson = runCollect("dub describe").toJSONValue;
 	auto rootPackage = dubJson["rootPackage"];
-	yap(dubJson["rootPackage"]);
-	yap(dubJson["packages"]);
-	//yap(dubJson["packages"][0]["description"]);
 	JSONValue[string] packages;
 	foreach(i; 0..dubJson["packages"].length)
 	{
