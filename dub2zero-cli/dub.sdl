@@ -1,0 +1,8 @@
+name "dub2zero-cli"
+description "Convert a package from DUB to 0install"
+authors "Nick Sabalausky"
+homepage "https://github.com/Abscissa/DPak"
+license "zlib/libpng"
+
+dependency "scriptlike" version="~>0.10.2"
+dependency "std_data_json" version="~>0.18.3"

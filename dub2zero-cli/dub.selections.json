@@ -1,0 +1,8 @@
+{
+	"fileVersion": 1,
+	"versions": {
+		"scriptlike": "0.10.2+commit.6.g15c24b9",
+		"std_data_json": "0.18.3",
+		"taggedalgebraic": "0.10.13"
+	}
+}
