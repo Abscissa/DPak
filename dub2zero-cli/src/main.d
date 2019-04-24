@@ -66,7 +66,7 @@ void main(string[] args)
 	chdir(Path(packName~"-"~packVer)~packName);
 	
 	auto dubJson = runCollect("dub describe").toJSONValue;
-	auto rootPackage = dubJson["rootPackage"];
+	auto rootPackageName = dubJson["rootPackage"];
 	JSONValue[string] packages;
 	foreach(i; 0..dubJson["packages"].length)
 	{
@@ -79,8 +79,12 @@ void main(string[] args)
 		yap(dubJson["packages"][i]["description"]);
 	}
 	yap("===============");
+	JSONValue[string] targets;
 	foreach(i; 0..dubJson["targets"].length)
 	{
+		auto currTarget = dubJson["targets"][i];
+		targets[currPack["rootPackage"].toString] = currTarget;
+
 		yap("++++++++");
 		yap(dubJson["targets"][i]["rootPackage"]);
 		yap(dubJson["targets"][i]["packages"]);
@@ -88,12 +92,13 @@ void main(string[] args)
 		yap(dubJson["targets"][i]["linkDependencies"]);
 	}
 	yap("++++++++");
-	
+
 	yap(
 		feedTemplate.substitute(
-			"PACK_NAME", dubJson["rootPackage"].toString,
-			"PACK_DESC", dubJson["packages"][0]["description"].toString, //TODO: Use "target" not "packages"
-			"PACK_VER",  dubJson["packages"][0]["version"].toString,
+			"PACK_NAME", rootPackageName,
+			"PACK_DESC", packages[rootPackageName]["description"].toString,
+			"PACK_VER",  packages[rootPackageName]["version"].toString,
+			//"PACK_",  targets[rootPackageName][""].toString,
 		)
 	);
 	run("echo ==================================================================");
