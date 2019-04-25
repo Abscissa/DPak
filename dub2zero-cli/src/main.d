@@ -1,3 +1,4 @@
+import std.stdio;
 import scriptlike;
 import stdx.data.json;
 import std.algorithm.iteration;
@@ -12,7 +13,7 @@ immutable feedTemplate = `
   uri='PACK_URI'>
 
   <name>dub-PACK_NAME</name>
-  <summary>PACK_DESC</summary>
+  <summary>PACK_SUMMARY</summary>
 
   <group>
     <command name="run" path="myprog"/>
@@ -24,6 +25,160 @@ immutable feedTemplate = `
   </group>
 </interface>
 `;
+
+/// Stolen from Scriptlike. Module scriptlike.core needs fixed on compiler (ex: DMD 2.081):
+/// ../../scriptlike/src/scriptlike/core.d(331,3): Error: undefined identifier stderr
+template trace()
+{
+	void trace(string file = __FILE__, size_t line = __LINE__)()
+	{
+		stderr.writeln(file, "(", line, "): trace");
+		stderr.flush();
+	}
+}
+
+/// Copied here from Scriptlike in order wo work around DMD 19825
+/// by removing the 'lazy' from args.
+//void yap(T...)(lazy T args)
+void yap(T...)(T args)
+{
+	import std.stdio;
+	
+	if(scriptlikeEcho || scriptlikeDryRun)
+	{
+		if(scriptlikeCustomEcho)
+			scriptlikeCustomEcho(text(args));
+		else
+		{
+			writeln(args);
+			stdout.flush();
+		}
+	}
+}
+
+/// The information in `dub describe`, slightly-processed so we
+/// can lookup packages and targets by name.
+struct DubDescribeInfo
+{
+	JSONValue root;
+
+	string rootPackageName;
+	JSONValue[string] packages;
+	JSONValue[string] targets;
+	
+	/// Includes the root package itself as the first element.
+	string[] subPackageNames;
+
+	static DubDescribeInfo fromRawJson(string jsonStr)
+	{
+		DubDescribeInfo ret;
+
+		ret.root = jsonStr.toJSONValue;
+		ret.rootPackageName = ret.root["rootPackage"].toString;
+		ret.subPackageNames ~= ret.rootPackageName;
+
+		auto subPackagePrefix = ret.rootPackageName ~ ":";
+		
+		// Read packages
+		foreach(i; 0..ret.root["packages"].length)
+		{
+			auto currPack = ret.root["packages"][i];
+			auto currPackName = currPack["name"].toString;
+			ret.packages[currPackName] = currPack;
+			
+			// Is this a subpackage of the root package?
+			if(currPackName.startsWith(subPackagePrefix))
+				ret.subPackageNames ~= currPackName;
+
+			// Debug info
+			yap("--------");
+			yap(ret.root["packages"][i]["name"]);
+			yap(ret.root["packages"][i]["version"]);
+			yap(ret.root["packages"][i]["description"]);
+		}
+		yap("===============");
+
+		// Read targets
+		foreach(i; 0..ret.root["targets"].length)
+		{
+			auto currTarget = ret.root["targets"][i];
+			ret.targets[currTarget["rootPackage"].toString] = currTarget;
+
+			// Debug info
+			yap("++++++++");
+			yap(ret.root["targets"][i]["rootPackage"]);
+			yap(ret.root["targets"][i]["packages"]);
+			yap(ret.root["targets"][i]["dependencies"]);
+			yap(ret.root["targets"][i]["linkDependencies"]);
+		}
+		yap("++++++++");
+
+		return ret;
+	}
+}
+
+/// Abstraction of a single package available in dub via code.dlang.org.
+struct DubPackage
+{
+	string name;
+	DubPackageImpl[] versions; // In decreasing order
+
+	//TODO: Needs to include DubDescribeInfo from each invividual version.
+	static DubPackage[string] toDubPackages(DubDescribeInfo dubInfo)
+	{
+		DubPackage[string] packages;
+		foreach(packName; dubInfo.subPackageNames)
+			packages[packName] = DubPackage.fromDubInfo(dubInfo, packName);
+		
+		return packages;
+	}
+
+	static DubPackage fromDubInfo(DubDescribeInfo dubInfo, string packageName)
+	{
+		DubPackage pack;
+		pack.name = packageName;
+
+		//auto packInfo = dubInfo.packages[packageName];
+		//auto targetInfo = dubInfo.targets[packageName];
+		
+		
+		return pack;
+	}
+}
+
+/// Abstraction of a single version of a single package available in dub via code.dlang.org.
+struct DubPackageImpl
+{
+	string name;
+	string ver;
+	JSONValue packageJson;
+	JSONValue targetJson;
+
+	/+static DubPackageImpl readFromDub(JSONValue jsonRoot)
+	{
+		
+	}+/
+}
+
+/// A 0install "feed". A package that includes all versions.
+struct ZeroPackage
+{
+	string name;
+	string uri;
+
+	ZeroPackageImpl[] versions; // In decreasing order
+}
+
+/// A 0install "implementation". Ie, an individual version of a package.
+struct ZeroPackageImpl
+{
+	string name;
+	string ver;
+	string summary;
+	string archiveUrl;
+	string archiveSize;
+	string archiveHash; // sha256new
+}
 
 void processArgs(ref string[] args)
 {
@@ -65,42 +220,22 @@ void main(string[] args)
 	run("dub fetch --cache=local "~packName~" --version="~packVer);
 	chdir(Path(packName~"-"~packVer)~packName);
 	
-	auto dubJson = runCollect("dub describe").toJSONValue;
-	auto rootPackageName = dubJson["rootPackage"];
-	JSONValue[string] packages;
-	foreach(i; 0..dubJson["packages"].length)
-	{
-		auto currPack = dubJson["packages"][i];
-		packages[currPack["name"].toString] = currPack;
-
-		yap("--------");
-		yap(dubJson["packages"][i]["name"]);
-		yap(dubJson["packages"][i]["version"]);
-		yap(dubJson["packages"][i]["description"]);
-	}
-	yap("===============");
-	JSONValue[string] targets;
-	foreach(i; 0..dubJson["targets"].length)
-	{
-		auto currTarget = dubJson["targets"][i];
-		targets[currPack["rootPackage"].toString] = currTarget;
-
-		yap("++++++++");
-		yap(dubJson["targets"][i]["rootPackage"]);
-		yap(dubJson["targets"][i]["packages"]);
-		yap(dubJson["targets"][i]["dependencies"]);
-		yap(dubJson["targets"][i]["linkDependencies"]);
-	}
-	yap("++++++++");
+	auto dubInfo = DubDescribeInfo.fromRawJson( runCollect("dub describe") );
+	yap("dubInfo.rootPackageName: ", dubInfo.rootPackageName);
+	yap("dubInfo.subPackageNames: ", dubInfo.subPackageNames);
+	
+	DubPackage  rootDubPackage = DubPackage.fromDubInfo(dubInfo, dubInfo.rootPackageName);
+	ZeroPackage rootZeroPackage;
+	rootZeroPackage.name = dubInfo.rootPackageName;
 
 	yap(
 		feedTemplate.substitute(
-			"PACK_NAME", rootPackageName,
-			"PACK_DESC", packages[rootPackageName]["description"].toString,
-			"PACK_VER",  packages[rootPackageName]["version"].toString,
-			//"PACK_",  targets[rootPackageName][""].toString,
+			"PACK_NAME",    rootZeroPackage.name,
+			"PACK_SUMMARY", dubInfo.packages[rootDubPackage.name]["description"].toString,
+			"PACK_VER",     dubInfo.packages[rootDubPackage.name]["version"].toString,
+			//"PACK_",  dubInfo.targets[rootDubPackage.name][""].toString,
 		)
 	);
-	run("echo ==================================================================");
+	//run("echo ==================================================================");
 	//run("cat dub.json");
 }
