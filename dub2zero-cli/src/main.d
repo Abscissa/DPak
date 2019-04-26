@@ -2,6 +2,7 @@ import std.stdio;
 import scriptlike;
 import stdx.data.json;
 import std.algorithm.iteration;
+import vibe.inet.urltransfer : download;
 
 immutable appName = "dub2zero-cli";
 immutable usage = "Usage: "~appName~" [--help] PACKAGE_NAME VERSION";
@@ -121,16 +122,39 @@ struct DubDescribeInfo
 struct DubPackage
 {
 	string name;
+	JSONValue jsonInfo;
+	string[] versionNames;
 	DubPackageImpl[] versions; // In decreasing order
 
 	//TODO: Needs to include DubDescribeInfo from each invividual version.
-	static DubPackage[string] toDubPackages(DubDescribeInfo dubInfo)
+	static DubPackage fromRepoInfo(JSONValue info, string packageName)
 	{
-		DubPackage[string] packages;
+		DubPackage pack;
+		pack.jsonInfo = info;
+		pack.name = packageName;//info["repository"]["project"].toString;
+		yap("pack.name: ", pack.name);
+
+		foreach_reverse(i; 0..info["versions"].length)
+		{
+			pack.versionNames ~= info["versions"][i]["version"].toString;
+			yap("ver: ", info["versions"][i]["version"]);
+		}
+
+		foreach(ver; pack.versionNames)
+		{
+			auto url = "https://code.dlang.org/api/packages/"~packageName~"/"~ver~"/info";
+			yap("Processing: ", url);
+			download(url, "info."~ver~".json");
+			auto verInfoRoot = (cast(string)read("info."~ver~".json")).toJSONValue;
+			//yap("info."~ver~".json");
+			pack.versions ~= DubPackageImpl.fromVerInfo(verInfoRoot, packageName, ver);
+		}
+		
+		/+DubPackage[string] packages;
 		foreach(packName; dubInfo.subPackageNames)
 			packages[packName] = DubPackage.fromDubInfo(dubInfo, packName);
-		
-		return packages;
+		+/
+		return pack;
 	}
 
 	static DubPackage fromDubInfo(DubDescribeInfo dubInfo, string packageName)
@@ -151,13 +175,32 @@ struct DubPackageImpl
 {
 	string name;
 	string ver;
-	JSONValue packageJson;
-	JSONValue targetJson;
+	//JSONValue packageJson;
+	//JSONValue targetJson;
+	JSONValue json;
+	string desc;
+	string dateStr;
+	size_t numSubPackages;
 
-	/+static DubPackageImpl readFromDub(JSONValue jsonRoot)
+	static DubPackageImpl fromVerInfo(JSONValue jsonRoot, string name, string ver)
 	{
-		
-	}+/
+		DubPackageImpl ret;
+		ret.name = name;
+		ret.ver = ver;
+		ret.json = jsonRoot;
+
+		if("description" in jsonRoot["info"])
+			ret.desc = jsonRoot["info"]["description"].toString;
+
+		ret.dateStr = jsonRoot["date"].toString;
+
+		if("subPackages" in jsonRoot["info"])
+			ret.numSubPackages = jsonRoot["info"]["subPackages"].length;
+		else
+			ret.numSubPackages = 0;
+
+		return ret;
+	}
 }
 
 /// A 0install "feed". A package that includes all versions.
@@ -216,6 +259,30 @@ void main(string[] args)
 
 	auto workDir = sandbox(packName, packVer);
 	yap("In: ", getcwd);
+	
+	download("https://code.dlang.org/api/packages/"~packName~"/info", "info.json");
+	auto packInfoRoot = (cast(string)read("info.json")).toJSONValue;
+	yap(`packInfoRoot["dateAdded"]; `, packInfoRoot["dateAdded"]);
+
+	auto rootPack = DubPackage.fromRepoInfo(packInfoRoot, packName);
+	yap(rootPack.versionNames);
+	yap(rootPack.versions[0].name);
+	yap(rootPack.versions[0].ver);
+	yap(rootPack.versions[0].desc);
+	yap(rootPack.versions[0].dateStr);
+	yap(rootPack.versions[0].numSubPackages);
+
+	yap(
+		feedTemplate.substitute(
+			"PACK_NAME",    rootPack.name,
+			"PACK_SUMMARY", rootPack.versions[0].desc,
+			"PACK_VER",     rootPack.versions[0].ver,
+			//"PACK_",  dubInfo.targets[rootDubPackage.name][""].toString,
+		)
+	);
+	run("echo ++++++++++++++++++++++++++++++++++++++++++++++");
+
+	
 	
 	run("dub fetch --cache=local "~packName~" --version="~packVer);
 	chdir(Path(packName~"-"~packVer)~packName);

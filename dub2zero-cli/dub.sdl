@@ -6,3 +6,4 @@ license "zlib/libpng"
 
 dependency "scriptlike" version="~>0.10.2"
 dependency "std_data_json" version="~>0.18.3"
+dependency "vibe-d" version="~>0.8.5"
