@@ -5,7 +5,7 @@ import std.algorithm.iteration;
 import vibe.inet.urltransfer : download;
 
 immutable appName = "dub2zero-cli";
-immutable usage = "Usage: "~appName~" [--help] PACKAGE_NAME VERSION";
+immutable usage = "Usage: "~appName~" [--help] PACKAGE_NAME";
 
 immutable feedTemplate = `
 <?xml version="1.0"?>
@@ -59,6 +59,9 @@ void yap(T...)(T args)
 
 /// The information in `dub describe`, slightly-processed so we
 /// can lookup packages and targets by name.
+///
+/// Not sure whether I'm going to need this after all,
+/// but hang onto it for now, just in case.
 struct DubDescribeInfo
 {
 	JSONValue root;
@@ -143,38 +146,28 @@ struct DubPackage
 
 		return pack;
 	}
-
-	static DubPackage fromDubInfo(DubDescribeInfo dubInfo, string packageName)
-	{
-		DubPackage pack;
-		pack.name = packageName;
-
-		//auto packInfo = dubInfo.packages[packageName];
-		//auto targetInfo = dubInfo.targets[packageName];
-		
-		
-		return pack;
-	}
 }
 
 /// Abstraction of a single version of a single package available in dub via code.dlang.org.
 struct DubPackageImpl
 {
+	JSONValue json;
+
 	string name;
 	string ver;
-	//JSONValue packageJson;
-	//JSONValue targetJson;
-	JSONValue json;
 	string desc;
 	string dateStr;
 	size_t numSubPackages;
 
+	//JSONValue packageJson;
+	//JSONValue targetJson;
+
 	static DubPackageImpl fromVerInfo(JSONValue verInfoRoot, string name)
 	{
 		DubPackageImpl ret;
+		ret.json = verInfoRoot;
 		ret.name = name;
 		ret.ver = verInfoRoot["version"].toString;
-		ret.json = verInfoRoot;
 
 		if("description" in verInfoRoot)
 			ret.desc = verInfoRoot["description"].toString;
@@ -222,16 +215,16 @@ void processArgs(ref string[] args)
 		return;
 	}
 
-	failEnforce(args.length == 3, usage);
+	failEnforce(args.length == 2, usage);
 
 	scriptlikeEcho = !quiet;
 }
 
-Path sandbox(string packName, string packVer)
+Path sandbox(string packName)
 {
 	auto origDir = getcwd();
 
-	auto packDir = tempDir~appName~packName~packVer;
+	auto packDir = tempDir~appName~packName;
 	mkdirRecurse(packDir);
 	chdir(packDir);
 
@@ -242,54 +235,39 @@ void main(string[] args)
 {
 	processArgs(args);
 	auto packName = args[1];
-	auto packVer  = args[2];
 
-	auto workDir = sandbox(packName, packVer);
+	auto workDir = sandbox(packName);
 	yap("In: ", getcwd);
 	
 	download("https://code.dlang.org/api/packages/"~packName~"/info", "info.json");
 	auto packInfoRoot = (cast(string)read("info.json")).toJSONValue;
 	yap(`packInfoRoot["dateAdded"]; `, packInfoRoot["dateAdded"]);
 
-	auto rootPack = DubPackage.fromRepoInfo(packInfoRoot, packName);
-	yap(rootPack.versionNames);
-	yap(rootPack.versions[0].name);
-	yap(rootPack.versions[0].ver);
-	yap(rootPack.versions[0].desc);
-	yap(rootPack.versions[0].dateStr);
-	yap(rootPack.versions[0].numSubPackages);
+	auto rootDubPackage = DubPackage.fromRepoInfo(packInfoRoot, packName);
+	yap(rootDubPackage.versionNames);
+	yap(rootDubPackage.versions[0].name);
+	yap(rootDubPackage.versions[0].ver);
+	yap(rootDubPackage.versions[0].desc);
+	yap(rootDubPackage.versions[0].dateStr);
+	yap(rootDubPackage.versions[0].numSubPackages);
+
+	ZeroPackage rootZeroPackage;
 
 	yap(
 		feedTemplate.substitute(
-			"PACK_NAME",    rootPack.name,
-			"PACK_SUMMARY", rootPack.versions[0].desc,
-			"PACK_VER",     rootPack.versions[0].ver,
+			"PACK_NAME",    rootDubPackage.name,
+			"PACK_SUMMARY", rootDubPackage.versions[0].desc,
+			"PACK_VER",     rootDubPackage.versions[0].ver,
 			//"PACK_",  dubInfo.targets[rootDubPackage.name][""].toString,
 		)
 	);
-	run("echo ++++++++++++++++++++++++++++++++++++++++++++++");
 
-	
-	
+	/+
 	run("dub fetch --cache=local "~packName~" --version="~packVer);
 	chdir(Path(packName~"-"~packVer)~packName);
 	
 	auto dubInfo = DubDescribeInfo.fromRawJson( runCollect("dub describe") );
 	yap("dubInfo.rootPackageName: ", dubInfo.rootPackageName);
 	yap("dubInfo.subPackageNames: ", dubInfo.subPackageNames);
-	
-	DubPackage  rootDubPackage = DubPackage.fromDubInfo(dubInfo, dubInfo.rootPackageName);
-	ZeroPackage rootZeroPackage;
-	rootZeroPackage.name = dubInfo.rootPackageName;
-
-	yap(
-		feedTemplate.substitute(
-			"PACK_NAME",    rootZeroPackage.name,
-			"PACK_SUMMARY", dubInfo.packages[rootDubPackage.name]["description"].toString,
-			"PACK_VER",     dubInfo.packages[rootDubPackage.name]["version"].toString,
-			//"PACK_",  dubInfo.targets[rootDubPackage.name][""].toString,
-		)
-	);
-	//run("echo ==================================================================");
-	//run("cat dub.json");
+	+/
 }
