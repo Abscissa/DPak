@@ -126,34 +126,21 @@ struct DubPackage
 	string[] versionNames;
 	DubPackageImpl[] versions; // In decreasing order
 
-	//TODO: Needs to include DubDescribeInfo from each invividual version.
 	static DubPackage fromRepoInfo(JSONValue info, string packageName)
 	{
 		DubPackage pack;
 		pack.jsonInfo = info;
-		pack.name = packageName;//info["repository"]["project"].toString;
+		pack.name = packageName;
 		yap("pack.name: ", pack.name);
 
 		foreach_reverse(i; 0..info["versions"].length)
 		{
 			pack.versionNames ~= info["versions"][i]["version"].toString;
 			yap("ver: ", info["versions"][i]["version"]);
+			
+			pack.versions ~= DubPackageImpl.fromVerInfo(info["versions"][i], packageName);
 		}
 
-		foreach(ver; pack.versionNames)
-		{
-			auto url = "https://code.dlang.org/api/packages/"~packageName~"/"~ver~"/info";
-			yap("Processing: ", url);
-			download(url, "info."~ver~".json");
-			auto verInfoRoot = (cast(string)read("info."~ver~".json")).toJSONValue;
-			//yap("info."~ver~".json");
-			pack.versions ~= DubPackageImpl.fromVerInfo(verInfoRoot, packageName, ver);
-		}
-		
-		/+DubPackage[string] packages;
-		foreach(packName; dubInfo.subPackageNames)
-			packages[packName] = DubPackage.fromDubInfo(dubInfo, packName);
-		+/
 		return pack;
 	}
 
@@ -182,20 +169,20 @@ struct DubPackageImpl
 	string dateStr;
 	size_t numSubPackages;
 
-	static DubPackageImpl fromVerInfo(JSONValue jsonRoot, string name, string ver)
+	static DubPackageImpl fromVerInfo(JSONValue verInfoRoot, string name)
 	{
 		DubPackageImpl ret;
 		ret.name = name;
-		ret.ver = ver;
-		ret.json = jsonRoot;
+		ret.ver = verInfoRoot["version"].toString;
+		ret.json = verInfoRoot;
 
-		if("description" in jsonRoot["info"])
-			ret.desc = jsonRoot["info"]["description"].toString;
+		if("description" in verInfoRoot)
+			ret.desc = verInfoRoot["description"].toString;
 
-		ret.dateStr = jsonRoot["date"].toString;
+		ret.dateStr = verInfoRoot["date"].toString;
 
-		if("subPackages" in jsonRoot["info"])
-			ret.numSubPackages = jsonRoot["info"]["subPackages"].length;
+		if("subPackages" in verInfoRoot)
+			ret.numSubPackages = verInfoRoot["subPackages"].length;
 		else
 			ret.numSubPackages = 0;
 
