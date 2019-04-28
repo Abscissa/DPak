@@ -28,7 +28,7 @@ PACK_IMPLS
 
 immutable feedTemplateImpls = `
     <implementation id="dpak-dub-PACK_NAME-PACK_VER" version="PACK_VER">
-      <manifest-digest sha256new="FBXDJXLMHAPCRNZ5XOQTVYQHD6VP7CZAZ2UKCCV5UYE27C752GIQ"/>
+      <manifest-digest sha256="PACK_ARCHIVE_SHA256"/>
       <archive extract="dub-PACK_NAME-PACK_VER" href="PACK_ARCHIVE_URL" size="PACK_ARCHIVE_SIZE"/>
     </implementation>
 `;
@@ -214,6 +214,7 @@ struct DubPackageImpl
 	size_t numSubPackages;
 	
 	size_t archiveSize; /// In bytes
+	string archiveSha256;
 
 	//JSONValue packageJson;
 	//JSONValue targetJson;
@@ -239,6 +240,8 @@ struct DubPackageImpl
 		{
 			download(repo.archiveUrl(ver), ver~".zip");
 			ret.archiveSize = getSize(ver~".zip");
+			auto shaResult = runCollect("sha256sum -b "~ver~".zip");
+			ret.archiveSha256 = shaResult.findSplitBefore(" ")[0];
 		}
 
 		return ret;
@@ -318,10 +321,11 @@ void main(string[] args)
 	foreach(ver; rootDubPackage.versionNames)
 	if(ver[0] != '~')
 		feedImpls ~= feedTemplateImpls.byCodeUnit.substitute(
-			"PACK_NAME",         rootDubPackage.name,
-			"PACK_VER",          ver,
-			"PACK_ARCHIVE_URL",  rootDubPackage.repo.archiveUrl(ver),
-			"PACK_ARCHIVE_SIZE", text(rootDubPackage.versions[ver].archiveSize),
+			"PACK_NAME",           rootDubPackage.name,
+			"PACK_VER",            ver,
+			"PACK_ARCHIVE_URL",    rootDubPackage.repo.archiveUrl(ver),
+			"PACK_ARCHIVE_SIZE",   text(rootDubPackage.versions[ver].archiveSize),
+			"PACK_ARCHIVE_SHA256", rootDubPackage.versions[ver].archiveSha256,
 		).array.to!string; // I have no idea why byCodeUnit is giving me dchar[]...
 	
 	yap(
