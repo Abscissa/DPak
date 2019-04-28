@@ -38,7 +38,7 @@ template trace()
 	}
 }
 
-/// Copied here from Scriptlike in order wo work around DMD 19825
+/// Copied here from Scriptlike in order to work around DMD 19825
 /// by removing the 'lazy' from args.
 //void yap(T...)(lazy T args)
 void yap(T...)(T args)
@@ -126,8 +126,8 @@ struct DubPackage
 {
 	string name;
 	JSONValue jsonInfo;
-	string[] versionNames;
-	DubPackageImpl[] versions; // In decreasing order
+	string[] versionNames; // In decreasing order
+	DubPackageImpl[string] versions;
 
 	static DubPackage fromRepoInfo(JSONValue info, string packageName)
 	{
@@ -138,10 +138,12 @@ struct DubPackage
 
 		foreach_reverse(i; 0..info["versions"].length)
 		{
-			pack.versionNames ~= info["versions"][i]["version"].toString;
-			yap("ver: ", info["versions"][i]["version"]);
-			
-			pack.versions ~= DubPackageImpl.fromVerInfo(info["versions"][i], packageName);
+			auto verInfoRoot = info["versions"][i];
+			auto ver = verInfoRoot["version"].toString;
+			yap("ver: ", ver);
+
+			pack.versionNames ~= ver;
+			pack.versions[ver] = DubPackageImpl.fromVerInfo(verInfoRoot, packageName, ver);
 		}
 
 		return pack;
@@ -162,12 +164,12 @@ struct DubPackageImpl
 	//JSONValue packageJson;
 	//JSONValue targetJson;
 
-	static DubPackageImpl fromVerInfo(JSONValue verInfoRoot, string name)
+	static DubPackageImpl fromVerInfo(JSONValue verInfoRoot, string name, string ver)
 	{
 		DubPackageImpl ret;
 		ret.json = verInfoRoot;
 		ret.name = name;
-		ret.ver = verInfoRoot["version"].toString;
+		ret.ver = ver;
 
 		if("description" in verInfoRoot)
 			ret.desc = verInfoRoot["description"].toString;
@@ -245,19 +247,20 @@ void main(string[] args)
 
 	auto rootDubPackage = DubPackage.fromRepoInfo(packInfoRoot, packName);
 	yap(rootDubPackage.versionNames);
-	yap(rootDubPackage.versions[0].name);
-	yap(rootDubPackage.versions[0].ver);
-	yap(rootDubPackage.versions[0].desc);
-	yap(rootDubPackage.versions[0].dateStr);
-	yap(rootDubPackage.versions[0].numSubPackages);
+	auto latestVer = rootDubPackage.versionNames[0];
+	yap(rootDubPackage.versions[latestVer].name);
+	yap(rootDubPackage.versions[latestVer].ver);
+	yap(rootDubPackage.versions[latestVer].desc);
+	yap(rootDubPackage.versions[latestVer].dateStr);
+	yap(rootDubPackage.versions[latestVer].numSubPackages);
 
 	ZeroPackage rootZeroPackage;
 
 	yap(
 		feedTemplate.substitute(
 			"PACK_NAME",    rootDubPackage.name,
-			"PACK_SUMMARY", rootDubPackage.versions[0].desc,
-			"PACK_VER",     rootDubPackage.versions[0].ver,
+			"PACK_SUMMARY", rootDubPackage.versions[latestVer].desc,
+			"PACK_VER",     rootDubPackage.versions[latestVer].ver,
 			//"PACK_",  dubInfo.targets[rootDubPackage.name][""].toString,
 		)
 	);
