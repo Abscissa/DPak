@@ -126,13 +126,22 @@ struct DubPackage
 {
 	string name;
 	JSONValue jsonInfo;
-	string[] versionNames; // In decreasing order
+	string latestVersion;
+	string[] versionNames; // Seems to be in decreasing order
 	DubPackageImpl[string] versions;
 
-	static DubPackage fromRepoInfo(JSONValue info, string packageName)
+	static DubPackage fromCodeDlangOrg(string packageName)
 	{
+		download("https://code.dlang.org/api/packages/"~packageName~"/info", "info.json");
+		auto info = (cast(string)read("info.json")).toJSONValue;
+		yap(`info["dateAdded"]; `, info["dateAdded"]);
+
+		download("https://code.dlang.org/api/packages/"~packageName~"/latest", "latest.json");
+		auto latest = (cast(string)read("latest.json")).toJSONValue.toString;
+
 		DubPackage pack;
 		pack.jsonInfo = info;
+		pack.latestVersion = latest;
 		pack.name = packageName;
 		yap("pack.name: ", pack.name);
 
@@ -241,13 +250,9 @@ void main(string[] args)
 	auto workDir = sandbox(packName);
 	yap("In: ", getcwd);
 	
-	download("https://code.dlang.org/api/packages/"~packName~"/info", "info.json");
-	auto packInfoRoot = (cast(string)read("info.json")).toJSONValue;
-	yap(`packInfoRoot["dateAdded"]; `, packInfoRoot["dateAdded"]);
-
-	auto rootDubPackage = DubPackage.fromRepoInfo(packInfoRoot, packName);
+	auto rootDubPackage = DubPackage.fromCodeDlangOrg(packName);
 	yap(rootDubPackage.versionNames);
-	auto latestVer = rootDubPackage.versionNames[0];
+	auto latestVer = rootDubPackage.latestVersion;
 	yap(rootDubPackage.versions[latestVer].name);
 	yap(rootDubPackage.versions[latestVer].ver);
 	yap(rootDubPackage.versions[latestVer].desc);
