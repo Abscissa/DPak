@@ -21,7 +21,7 @@ immutable feedTemplate = `
 
     <implementation id="dpak-dub-PACK_NAME-PACK_VER" version="PACK_VER">
       <manifest-digest sha256new="FBXDJXLMHAPCRNZ5XOQTVYQHD6VP7CZAZ2UKCCV5UYE27C752GIQ"/>
-      <archive extract="dub-PACK_NAME-PACK_VER" href="http://example.com/downloads/PACK_NAME-PACK_VER.zip" size="352"/>
+      <archive extract="dub-PACK_NAME-PACK_VER" href="PACK_ARCHIVE_URL" size="352"/>
     </implementation>
   </group>
 </interface>
@@ -174,6 +174,13 @@ struct DubPackageRepo
 	
 	string urlBase;
 	
+	string archiveUrl(string ver)
+	{
+		enforce(ver[0] != '~', "Archive URLs not supported for branches, only tagged releases.");
+		//TODO: Are version tags *always* of the form "v1.2.3"? Because if they're ever "1.2.3" then this might fail.
+		return urlBase~"archive/v"~ver~".zip";
+	}
+	
 	static DubPackageRepo fromJsonInfo(JSONValue info)
 	{
 		DubPackageRepo ret;
@@ -288,14 +295,16 @@ void main(string[] args)
 	yap(rootDubPackage.versions[latestVer].dateStr);
 	yap(rootDubPackage.versions[latestVer].numSubPackages);
 	yap(rootDubPackage.repo.urlBase);
+	yap(rootDubPackage.repo.archiveUrl(latestVer));
 
 	ZeroPackage rootZeroPackage;
 
 	yap(
 		feedTemplate.substitute(
-			"PACK_NAME",    rootDubPackage.name,
-			"PACK_SUMMARY", rootDubPackage.versions[latestVer].desc,
-			"PACK_VER",     rootDubPackage.versions[latestVer].ver,
+			"PACK_NAME",        rootDubPackage.name,
+			"PACK_SUMMARY",     rootDubPackage.versions[latestVer].desc,
+			"PACK_VER",         rootDubPackage.versions[latestVer].ver,
+			"PACK_ARCHIVE_URL", rootDubPackage.repo.archiveUrl(latestVer),
 			//"PACK_",  dubInfo.targets[rootDubPackage.name][""].toString,
 		)
 	);
