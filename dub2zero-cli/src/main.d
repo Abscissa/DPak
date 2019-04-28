@@ -1,13 +1,15 @@
+import std.algorithm.iteration;
 import std.stdio;
+import std.utf;
+
 import scriptlike;
 import stdx.data.json;
-import std.algorithm.iteration;
 import vibe.inet.urltransfer : download;
 
 immutable appName = "dub2zero-cli";
 immutable usage = "Usage: "~appName~" [--help] PACKAGE_NAME";
 
-immutable feedTemplate = `
+immutable feedTemplateRoot = `
 <?xml version="1.0"?>
 <interface xmlns="http://zero-install.sourceforge.net/2004/injector/interface"
   min-injector-version='2.12'
@@ -19,13 +21,19 @@ immutable feedTemplate = `
   <group>
     <command name="run" path="myprog"/>
 
+PACK_IMPLS
+  </group>
+</interface>
+`;
+
+immutable feedTemplateImpls = `
     <implementation id="dpak-dub-PACK_NAME-PACK_VER" version="PACK_VER">
       <manifest-digest sha256new="FBXDJXLMHAPCRNZ5XOQTVYQHD6VP7CZAZ2UKCCV5UYE27C752GIQ"/>
       <archive extract="dub-PACK_NAME-PACK_VER" href="PACK_ARCHIVE_URL" size="352"/>
     </implementation>
-  </group>
-</interface>
 `;
+
+
 
 /// Stolen from Scriptlike. Module scriptlike.core needs fixed on compiler (ex: DMD 2.081):
 /// ../../scriptlike/src/scriptlike/core.d(331,3): Error: undefined identifier stderr
@@ -57,7 +65,7 @@ void yap(T...)(T args)
 	}
 }
 
-/// The information in `dub describe`, slightly-processed so we
+/// The information in `dub describe`, slightly-procPACK_VERessed so we
 /// can lookup packages and targets by name.
 ///
 /// Not sure whether I'm going to need this after all,
@@ -299,13 +307,20 @@ void main(string[] args)
 
 	ZeroPackage rootZeroPackage;
 
+	string feedImpls;
+	foreach(ver; rootDubPackage.versionNames)
+	if(ver[0] != '~')
+		feedImpls ~= feedTemplateImpls.byCodeUnit.substitute(
+			"PACK_NAME",        rootDubPackage.name,
+			"PACK_VER",         ver,
+			"PACK_ARCHIVE_URL", rootDubPackage.repo.archiveUrl(ver),
+		).array.to!string; // I have no idea why byCodeUnit is giving me dchar[]...
+	
 	yap(
-		feedTemplate.substitute(
+		feedTemplateRoot.byCodeUnit.substitute(
 			"PACK_NAME",        rootDubPackage.name,
 			"PACK_SUMMARY",     rootDubPackage.versions[latestVer].desc,
-			"PACK_VER",         rootDubPackage.versions[latestVer].ver,
-			"PACK_ARCHIVE_URL", rootDubPackage.repo.archiveUrl(latestVer),
-			//"PACK_",  dubInfo.targets[rootDubPackage.name][""].toString,
+			"PACK_IMPLS",       feedImpls,
 		)
 	);
 
