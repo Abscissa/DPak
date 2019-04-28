@@ -20,7 +20,6 @@ immutable feedTemplateRoot = `
 
   <group>
     <command name="run" path="myprog"/>
-
 PACK_IMPLS
   </group>
 </interface>
@@ -29,7 +28,7 @@ PACK_IMPLS
 immutable feedTemplateImpls = `
     <implementation id="dpak-dub-PACK_NAME-PACK_VER" version="PACK_VER">
       <manifest-digest sha256="PACK_ARCHIVE_SHA256"/>
-      <archive extract="dub-PACK_NAME-PACK_VER" href="PACK_ARCHIVE_URL" size="PACK_ARCHIVE_SIZE"/>
+      <archive extract="dpak-dub-PACK_NAME-PACK_VER" href="PACK_ARCHIVE_URL" size="PACK_ARCHIVE_SIZE"/>
     </implementation>
 `;
 
