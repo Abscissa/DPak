@@ -29,7 +29,7 @@ PACK_IMPLS
 immutable feedTemplateImpls = `
     <implementation id="dpak-dub-PACK_NAME-PACK_VER" version="PACK_VER">
       <manifest-digest sha256new="FBXDJXLMHAPCRNZ5XOQTVYQHD6VP7CZAZ2UKCCV5UYE27C752GIQ"/>
-      <archive extract="dub-PACK_NAME-PACK_VER" href="PACK_ARCHIVE_URL" size="352"/>
+      <archive extract="dub-PACK_NAME-PACK_VER" href="PACK_ARCHIVE_URL" size="PACK_ARCHIVE_SIZE"/>
     </implementation>
 `;
 
@@ -166,7 +166,7 @@ struct DubPackage
 			yap("ver: ", ver);
 
 			pack.versionNames ~= ver;
-			pack.versions[ver] = DubPackageImpl.fromVerInfo(verInfoRoot, packageName, ver);
+			pack.versions[ver] = DubPackageImpl.fromVerInfo(verInfoRoot, packageName, ver, pack.repo);
 		}
 
 		return pack;
@@ -198,7 +198,6 @@ struct DubPackageRepo
 		enforce(ret.kind == "github", "Unknown repo type '"~ret.kind~"' found, only 'github' is currently supported.");
 		
 		ret.urlBase = "https://github.com/"~ret.owner~"/"~ret.project~"/";
-
 		return ret;
 	}
 }
@@ -213,11 +212,13 @@ struct DubPackageImpl
 	string desc;
 	string dateStr;
 	size_t numSubPackages;
+	
+	size_t archiveSize; /// In bytes
 
 	//JSONValue packageJson;
 	//JSONValue targetJson;
 
-	static DubPackageImpl fromVerInfo(JSONValue verInfoRoot, string name, string ver)
+	static DubPackageImpl fromVerInfo(JSONValue verInfoRoot, string name, string ver, DubPackageRepo repo)
 	{
 		DubPackageImpl ret;
 		ret.json = verInfoRoot;
@@ -233,6 +234,12 @@ struct DubPackageImpl
 			ret.numSubPackages = verInfoRoot["subPackages"].length;
 		else
 			ret.numSubPackages = 0;
+
+		if(ver[0] != '~')
+		{
+			download(repo.archiveUrl(ver), ver~".zip");
+			ret.archiveSize = getSize(ver~".zip");
+		}
 
 		return ret;
 	}
@@ -311,9 +318,10 @@ void main(string[] args)
 	foreach(ver; rootDubPackage.versionNames)
 	if(ver[0] != '~')
 		feedImpls ~= feedTemplateImpls.byCodeUnit.substitute(
-			"PACK_NAME",        rootDubPackage.name,
-			"PACK_VER",         ver,
-			"PACK_ARCHIVE_URL", rootDubPackage.repo.archiveUrl(ver),
+			"PACK_NAME",         rootDubPackage.name,
+			"PACK_VER",          ver,
+			"PACK_ARCHIVE_URL",  rootDubPackage.repo.archiveUrl(ver),
+			"PACK_ARCHIVE_SIZE", text(rootDubPackage.versions[ver].archiveSize),
 		).array.to!string; // I have no idea why byCodeUnit is giving me dchar[]...
 	
 	yap(
