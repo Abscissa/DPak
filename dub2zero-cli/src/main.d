@@ -126,8 +126,10 @@ struct DubPackage
 {
 	string name;
 	JSONValue jsonInfo;
+	DubPackageRepo repo; /// The package's version control repository
+	
 	string latestVersion;
-	string[] versionNames; // Seems to be in decreasing order
+	string[] versionNames; /// Seems to be in decreasing order
 	DubPackageImpl[string] versions;
 
 	static DubPackage fromCodeDlangOrg(string packageName)
@@ -144,7 +146,11 @@ struct DubPackage
 		pack.latestVersion = latest;
 		pack.name = packageName;
 		yap("pack.name: ", pack.name);
+		pack.repo = DubPackageRepo.fromJsonInfo(info);
 
+		// Server seems to send versions in increasing order.
+		// Not sure whether that's guaranteed behavior, but if it is,
+		// let's reverse it to get decreasing order.
 		foreach_reverse(i; 0..info["versions"].length)
 		{
 			auto verInfoRoot = info["versions"][i];
@@ -156,6 +162,29 @@ struct DubPackage
 		}
 
 		return pack;
+	}
+}
+
+/// The package's version control repository.
+struct DubPackageRepo
+{
+	string project; /// Typically the package's name, but not always.
+	string owner;
+	string kind; /// ATM, only "github" is supported.
+	
+	string urlBase;
+	
+	static DubPackageRepo fromJsonInfo(JSONValue info)
+	{
+		DubPackageRepo ret;
+		ret.project = info["repository"]["project"].toString;
+		ret.owner   = info["repository"]["owner"].toString;
+		ret.kind    = info["repository"]["kind"].toString;
+		enforce(ret.kind == "github", "Unknown repo type '"~ret.kind~"' found, only 'github' is currently supported.");
+		
+		ret.urlBase = "https://github.com/"~ret.owner~"/"~ret.project~"/";
+
+		return ret;
 	}
 }
 
@@ -258,6 +287,7 @@ void main(string[] args)
 	yap(rootDubPackage.versions[latestVer].desc);
 	yap(rootDubPackage.versions[latestVer].dateStr);
 	yap(rootDubPackage.versions[latestVer].numSubPackages);
+	yap(rootDubPackage.repo.urlBase);
 
 	ZeroPackage rootZeroPackage;
 
