@@ -6,6 +6,9 @@ import scriptlike;
 import stdx.data.json;
 import vibe.inet.urltransfer : download;
 
+//TODO: This tool should include and use its own copy of 0install, to avoid
+//      relying on the user having it already set up.
+
 immutable appName = "dub2zero-cli";
 immutable usage = "Usage: "~appName~" [--help] PACKAGE_NAME";
 
@@ -31,8 +34,6 @@ immutable feedTemplateImpls = `
       <archive extract="dpak-dub-PACK_NAME-PACK_VER" href="PACK_ARCHIVE_URL" size="PACK_ARCHIVE_SIZE"/>
     </implementation>
 `;
-
-
 
 /// Stolen from Scriptlike. Module scriptlike.core needs fixed on compiler (ex: DMD 2.081):
 /// ../../scriptlike/src/scriptlike/core.d(331,3): Error: undefined identifier stderr
@@ -239,7 +240,14 @@ struct DubPackageImpl
 		{
 			download(repo.archiveUrl(ver), ver~".zip");
 			ret.archiveSize = getSize(ver~".zip");
-			auto shaResult = runCollect("sha256sum -b "~ver~".zip");
+			
+			//TODO: Extract ver~".zip"
+			
+			//auto manifestInfo = runCollect("eval $(opam config env) && 0store manifest "~ver~" sha256new");
+			//TODO: Grab last line of `manifestInfo` and strip leading "sha256new_"
+			
+			// This method of obtaining the hash is wrong, just do say "To Be Determined" for now.
+			auto shaResult = "TBD";//runCollect("sha256sum -b "~ver~".zip");
 			ret.archiveSha256 = shaResult.findSplitBefore(" ")[0];
 		}
 
