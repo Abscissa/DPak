@@ -27,7 +27,7 @@ immutable feedTemplateRoot = `
 <?xml version="1.0"?>
 <interface xmlns="http://zero-install.sourceforge.net/2004/injector/interface"
   min-injector-version='2.12'
-  uri='PACK_URI'>
+  uri='https://semitwist.com/dpak/packages/PACK_NAME'>
 
   <name>dub-PACK_NAME</name>
   <summary>PACK_SUMMARY</summary>
