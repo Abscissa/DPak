@@ -9,6 +9,17 @@ import vibe.inet.urltransfer : download;
 //TODO: This tool should include and use its own copy of 0install, to avoid
 //      relying on the user having it already set up.
 
+/++
+Current Requirements (What this tool relies on):
+- opam
+- 0install v2.12+ (obtained through opam)
+- unzip (a standard Linux version of it)
+- eval (Such as in bash)
+
+Eventual goal is to minimize or eliminate these dependencies.
+But for the moment, these are what this tool currently relies on.
++/
+
 immutable appName = "dub2zero-cli";
 immutable usage = "Usage: "~appName~" [--help] PACKAGE_NAME";
 
