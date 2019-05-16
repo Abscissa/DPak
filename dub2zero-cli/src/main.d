@@ -27,9 +27,9 @@ immutable feedTemplateRoot = `
 <?xml version="1.0"?>
 <interface xmlns="http://zero-install.sourceforge.net/2004/injector/interface"
   min-injector-version='2.12'
-  uri='https://semitwist.com/dpak/packages/PACK_NAME'>
+  uri='https://semitwist.com/dpak/packages/PACK_ZERONAME'>
 
-  <name>dub-PACK_NAME</name>
+  <name>PACK_ZERONAME</name>
   <summary>PACK_SUMMARY</summary>
 
   <group>
@@ -40,9 +40,9 @@ PACK_IMPLS
 `;
 
 immutable feedTemplateImpls = `
-    <implementation id="dpak-dub-PACK_NAME-PACK_VER" version="PACK_VER">
+    <implementation id="PACK_ZERONAME-PACK_VER" version="PACK_VER">
       <manifest-digest sha256new="PACK_ARCHIVE_SHA256"/>
-      <archive extract="dpak-dub-PACK_NAME-PACK_VER" href="PACK_ARCHIVE_URL" size="PACK_ARCHIVE_SIZE"/>
+      <archive extract="PACK_ZERONAME-PACK_VER" href="PACK_ARCHIVE_URL" size="PACK_ARCHIVE_SIZE"/>
     </implementation>
 `;
 
@@ -143,7 +143,8 @@ struct DubDescribeInfo
 /// Abstraction of a single package available in dub via code.dlang.org.
 struct DubPackage
 {
-	string name;
+	string name; /// Name of DUB package.
+	string zeroName; /// Name of package in 0install.
 	JSONValue jsonInfo;
 	DubPackageRepo repo; /// The package's version control repository
 	
@@ -166,6 +167,7 @@ struct DubPackage
 		pack.name = packageName;
 		yap("pack.name: ", pack.name);
 		pack.repo = DubPackageRepo.fromJsonInfo(info);
+		pack.zeroName = "dpak-dub-"~pack.name;
 
 		// Server seems to send versions in increasing order.
 		// Not sure whether that's guaranteed behavior, but if it is,
@@ -341,7 +343,7 @@ void main(string[] args)
 	foreach(ver; rootDubPackage.versionNames)
 	if(ver[0] != '~')
 		feedImpls ~= feedTemplateImpls.byCodeUnit.substitute(
-			"PACK_NAME",           rootDubPackage.name,
+			"PACK_ZERONAME",       rootDubPackage.zeroName,
 			"PACK_VER",            ver,
 			"PACK_ARCHIVE_URL",    rootDubPackage.repo.archiveUrl(ver),
 			"PACK_ARCHIVE_SIZE",   text(rootDubPackage.versions[ver].archiveSize),
@@ -350,7 +352,7 @@ void main(string[] args)
 	
 	writeln(
 		feedTemplateRoot.byCodeUnit.substitute(
-			"PACK_NAME",        rootDubPackage.name,
+			"PACK_ZERONAME",    rootDubPackage.zeroName,
 			"PACK_SUMMARY",     rootDubPackage.versions[latestVer].desc,
 			"PACK_IMPLS",       feedImpls,
 		)
