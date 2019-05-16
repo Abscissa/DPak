@@ -30,7 +30,7 @@ PACK_IMPLS
 
 immutable feedTemplateImpls = `
     <implementation id="dpak-dub-PACK_NAME-PACK_VER" version="PACK_VER">
-      <manifest-digest sha256="PACK_ARCHIVE_SHA256"/>
+      <manifest-digest sha256new="PACK_ARCHIVE_SHA256"/>
       <archive extract="dpak-dub-PACK_NAME-PACK_VER" href="PACK_ARCHIVE_URL" size="PACK_ARCHIVE_SIZE"/>
     </implementation>
 `;
@@ -238,17 +238,19 @@ struct DubPackageImpl
 
 		if(ver[0] != '~')
 		{
-			download(repo.archiveUrl(ver), ver~".zip");
-			ret.archiveSize = getSize(ver~".zip");
+			auto basename = name~"-"~ver;
+			download(repo.archiveUrl(ver), basename~".zip");
+			ret.archiveSize = getSize(basename~".zip");
 			
-			//TODO: Extract ver~".zip"
+			tryRemovePath(basename);
+			run("unzip -q "~basename~".zip");
+			auto manifestInfo = runCollect("eval $(opam config env) && 0store manifest "~basename~" sha256new");
+			//yap(manifestInfo);
 			
-			//auto manifestInfo = runCollect("eval $(opam config env) && 0store manifest "~ver~" sha256new");
-			//TODO: Grab last line of `manifestInfo` and strip leading "sha256new_"
-			
-			// This method of obtaining the hash is wrong, just do say "To Be Determined" for now.
-			auto shaResult = "TBD";//runCollect("sha256sum -b "~ver~".zip");
-			ret.archiveSha256 = shaResult.findSplitBefore(" ")[0];
+			// Last line of manifestInfo looks like: "sha256new_TD7LPDAAPVOP2EXWHSBNZJOFXXKNY6SE4VOPJWNMZFERMQU6KIJQ"
+			auto lastLine = manifestInfo.byCodeUnit.strip.retro.splitter('\n').front.retro;
+			auto shaResult = lastLine.findSplitAfter("sha256new_")[1]; // Strip "sha256new_" prefix
+			ret.archiveSha256 = shaResult.array;
 		}
 
 		return ret;
