@@ -348,7 +348,7 @@ void main(string[] args)
 			"PACK_ARCHIVE_SHA256", rootDubPackage.versions[ver].archiveSha256,
 		).array.to!string; // I have no idea why byCodeUnit is giving me dchar[]...
 	
-	yap(
+	writeln(
 		feedTemplateRoot.byCodeUnit.substitute(
 			"PACK_NAME",        rootDubPackage.name,
 			"PACK_SUMMARY",     rootDubPackage.versions[latestVer].desc,
